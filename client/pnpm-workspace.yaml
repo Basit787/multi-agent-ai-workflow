@@ -1,0 +1,6 @@
+allowBuilds:
+  esbuild: true
+  lightningcss: true
+  core-js: false # postinstall only prints a banner
+packages:
+  - .

@@ -1,0 +1,86 @@
+Continue the "BullMQ queue + live workflow events" change in /Users/nodejs/self/multi-agent-ai-workflow.
+Follow .claude/rules, especially W28: no comments in code except tool directives such as biome-ignore.
+
+GOAL
+Today the client polls the API every 1.5–2 s while a workflow runs. Replace that with:
+- Server: POST /api/workflows stores the run as "queued" and adds a BullMQ job (Redis). A worker
+  with concurrency 1 runs the jobs one after another. Status goes queued → running → completed | failed.
+- Events: GET /api/workflows/events is a Server-Sent Events stream of { workflowId, status, stepCount }
+  for the signed-in user only.
+- Client: no polling. One EventSource refreshes the queries and shows a toast when a run is
+  generated or fails.
+
+ALREADY DONE (not yet type-checked)
+- server: @nestjs/bullmq 12.0.0 and bullmq 6.5.0 installed. server/pnpm-workspace.yaml has
+  allowBuilds msgpackr-extract: false.
+- docker-compose.yml: a redis service (redis:7-alpine, port 6379, redis_data volume, redis-cli ping
+  healthcheck). The server has REDIS_URL=redis://redis:6379 and depends_on redis being healthy.
+- server/libs/db/src/types.ts: WorkflowStatus = 'queued' | 'running' | 'completed' | 'failed'.
+- server/src/workflow/types/workflow.types.ts: adds WorkflowJob { workflowId, task } and
+  WorkflowEvent { workflowId, status, stepCount }.
+- server/src/common/utils/redis.ts: redisConnection() parses REDIS_URL (default redis://localhost:6379).
+- server/src/workflow/workflow.constants.ts: WORKFLOW_QUEUE = 'workflows'.
+- server/src/workflow/workflow.events.ts: WorkflowEvents (an rxjs Subject) with emit(),
+  forUser(userId) and finished(workflowId).
+- server/src/workflow/workflow.processor.ts: @Processor(WORKFLOW_QUEUE, { concurrency: 1 }) calls
+  workflowService.process(job.data).
+- server/src/workflow/workflow.service.ts:
+  - The queue is injected. enqueue() uses jobId `workflow-<id>` and emits "queued".
+  - start() and run() insert the row as "queued". run() waits on events.finished().
+  - process() skips anything not "queued", sets "running", emits after each agent, then finish().
+  - On startup it marks "running" runs failed and re-queues "queued" ones.
+  - remove() refuses with 409 while a run is queued or running.
+
+REMAINING — server
+1. workflow.controller.ts: add @Sse('events') BEFORE the ':id' routes. Merge events.forUser(req.user.id)
+   mapped to { type: 'workflow', data } with an interval(25_000) heartbeat { type: 'ping', data: '' }.
+2. workflow.module.ts: imports BullModule.registerQueue({ name: WORKFLOW_QUEUE }); add
+   WorkflowEvents and WorkflowProcessor to providers.
+3. app.module.ts: BullModule.forRoot({ connection: redisConnection() }) next to DbModule.
+4. server/index.ts: also export type WorkflowEvent.
+5. Run Biome, type-check and build for the server. Delete stray .js / .d.ts / .js.map files the editor
+   creates in server/libs/db/src.
+
+REMAINING — client (shared types come from "@server", type-only)
+6. routes/workflows/_lib/api/hook.ts: remove refetchInterval from useWorkflows and useWorkflow.
+7. routes/workflows/_lib/api/api.ts: subscribeToWorkflowEvents(onEvent) uses
+   new EventSource("/api/workflows/events", { withCredentials: true }), listens for "workflow" events,
+   parses WorkflowEvent and returns a close function.
+8. hook.ts: useWorkflowEvents():
+   - on every event, queryClient.invalidateQueries({ queryKey: ["workflows"] });
+   - on "completed": showSuccessToast("Workflow generated", with a View action that navigates to
+     /workflows/$workflowId);
+   - on "failed": showErrorToast.
+   Mount it in routes/workflows/route.tsx. Remove the old status-toast useEffect in
+   components/detail/workflow-detail-page.tsx.
+9. Handle "queued" everywhere:
+   - workflow-status-badge: "Queued" with a Clock icon;
+   - agents.ts agentStates: queued means every agent is pending;
+   - pipeline-card summary: "Waiting in the queue…";
+   - pipeline-action: View results disabled with a tooltip;
+   - workflow-actions isRunning: include queued, so delete and run-again are disabled;
+   - useCreateWorkflow toast: "Workflow queued";
+   - workflow-pdf status text.
+10. Run Biome, type-check and build for the client.
+
+REMAINING — docs and checks
+11. Update the docs:
+    - docs/server/api.md: the events endpoint and the queued status;
+    - docs/server/architecture.md: the queue and events;
+    - docs/server/development.md: REDIS_URL, and `docker compose up -d postgres redis` for local dev;
+    - docs/docker.md: a redis row;
+    - docs/client/architecture.md: SSE instead of polling.
+12. Verify with throwaway containers only (Postgres on 5499, Redis on 6380, the fake Ollama at
+    /private/tmp/claude-501/-Users-nodejs-self-multi-agent-ai-workflow/109e69c2-cfa0-46b1-a300-29aed6897e15/scratchpad/pw/fake-ollama.mjs):
+    - two runs started together are processed one after the other;
+    - `curl -N` on /api/workflows/events receives queued → running → completed;
+    - restarting the server mid-run marks the running run failed and resumes the queued one;
+    - the client updates with no polling requests.
+    Finally run `docker compose build`.
+
+CONSTRAINTS
+- Ports: client 3000, server 3001.
+- Auth is Better Auth (session cookie). DB access goes through DbService from @app/db.
+- Never read .env*, dist/ or node_modules/. Never use the user's pg_data volume.
+- Any new package version must be at least two weeks old.
+- If the user says "don't build or do anything", only report status.

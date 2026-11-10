@@ -15,16 +15,84 @@ services:
       interval: 5s
       retries: 5
 
-  app:
-    build: .
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
     ports:
-      - "3006:3006"
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 5
+
+  ollama:
+    image: alpine/ollama:0.40.11
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      retries: 10
+
+  ollama-pull:
+    image: alpine/ollama:0.40.11
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["ollama", "pull", "${OLLAMA_MODEL:-llama3.2}"]
+    restart: "no"
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+  floci:
+    image: floci/floci:latest
+    restart: unless-stopped
+    ports:
+      - "4566:4566"
+
+  server:
+    build:
+      context: ./server
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
     environment:
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/multi_agent
-      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      REDIS_URL: redis://redis:6379
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:-dev-secret-change-me-dev-secret-change-me}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:-http://localhost:3000}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      AWS_ENDPOINT_URL: http://floci:4566
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+      ollama-pull:
+        condition: service_completed_successfully
+      floci:
+        condition: service_started
+
+  client:
+    build:
+      context: ./client
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      SERVER_URL: http://server:3001
+    depends_on:
+      - server
 
 volumes:
   pg_data:
+  redis_data:
+  ollama_data:

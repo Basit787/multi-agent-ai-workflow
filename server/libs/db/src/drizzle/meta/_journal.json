@@ -1,0 +1,62 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1793972962508,
+      "tag": "0000_real_hairball",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794308326721,
+      "tag": "0001_volatile_silver_fox",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794309534303,
+      "tag": "0002_handy_shard",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794310137135,
+      "tag": "0003_fix_unfinished_runs",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794312354483,
+      "tag": "0004_drop_refresh_tokens",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794312368739,
+      "tag": "0005_better_auth_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794312377042,
+      "tag": "0006_move_passwords_to_accounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1794312377433,
+      "tag": "0007_drop_user_password",
+      "breakpoints": true
+    }
+  ]
+}

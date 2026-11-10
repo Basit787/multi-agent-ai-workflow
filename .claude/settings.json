@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+
+  "permissions": {
+    "defaultMode": "acceptEdits",
+
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(sed -n:*)",
+      "Bash(wc:*)",
+      "Bash(grep:*)",
+      "Bash(rg:*)",
+      "Bash(find:*)",
+      "Bash(jq:*)",
+      "Bash(node node_modules/typescript/bin/tsc:*)",
+      "Bash(npm run:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git branch:*)",
+      "Bash(git stash list:*)",
+      "Edit(src/**)",
+      "Edit(claude/**)",
+      "Edit(.claude/**)",
+      "Write(src/**)",
+      "Write(claude/**)",
+      "Write(.claude/**)"
+    ],
+
+    "deny": [
+      "Read(./dist/**)",
+      "Read(./node_modules/**)",
+      "Read(./.git/**)",
+      "Read(./coverage/**)",
+      "Read(./public/**/*.min.js)",
+      "Read(./package-lock.json)",
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./**/*.pem)",
+      "Read(./**/*.p12)",
+      "Edit(./dist/**)",
+      "Edit(./node_modules/**)",
+      "Edit(./.env)",
+      "Edit(./.env.*)",
+      "Bash(rm -rf /:*)",
+      "Bash(git push:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(npm publish:*)",
+      "Bash(bash scripts/rel.sh:*)",
+      "Bash(npm run rel:*)",
+      "Bash(npm run release:*)",
+      "Bash(npm run deploy:*)"
+    ],
+
+    "ask": [
+      "Bash(git commit:*)",
+      "Bash(git checkout:*)",
+      "Bash(git merge:*)",
+      "Bash(npm install:*)",
+      "Bash(npm uninstall:*)"
+    ]
+  },
+
+  "env": {
+    "NODE_OPTIONS": "--max-old-space-size=4096"
+  },
+
+  "respectGitignore": true,
+
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"SessionStart\",\"additionalContext\":\"START: do the asked change directly; grep to locate, sed -n to read the region. IGNORE: dist/, node_modules/, .git/, package-lock.json, .env*. STOP: when the asked change is made - no extra files, no docs unless it is a new feature (W10), no follow-up work.\"}}'",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+
+  "todoFeatureEnabled": false,
+  "autoCompactEnabled": true
+}

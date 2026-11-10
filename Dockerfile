@@ -1,25 +1,22 @@
-FROM node:20-alpine AS base
-WORKDIR /app
-RUN apk add --no-cache libc6-compat
+FROM node:24-alpine AS base
+RUN npm install -g pnpm@12.14.0
+WORKDIR /repo
 
-FROM base AS deps
-COPY package.json ./
-RUN npm install
+FROM base AS build
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
+COPY apps/backend/package.json apps/backend/
+COPY apps/frontend/package.json apps/frontend/
+RUN pnpm install --frozen-lockfile
+COPY apps apps
+RUN pnpm turbo run build
 
-FROM base AS builder
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
-
-FROM base AS runner
+FROM build AS backend
 ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/package.json ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/src/db ./src/db
-EXPOSE 3006
-CMD ["sh", "-c", "node node_modules/drizzle-kit/bin.cjs push --config=src/db/drizzle.config.ts && node server.js"]
+WORKDIR /repo/apps/backend
+EXPOSE 3001
+CMD ["node", "dist/index.js"]
+
+FROM build AS frontend
+WORKDIR /repo/apps/frontend
+EXPOSE 3000
+CMD ["pnpm", "preview"]
